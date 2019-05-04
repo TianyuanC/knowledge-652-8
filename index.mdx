@@ -40,27 +40,229 @@ export { future as theme } from "mdx-deck/themes";
 
 ## Unit Testing
 
--   enzyme
--   test-utils
+-   [test-utils](https://github.com/mpeyper/react-hooks-testing-library)
 
 ---
 
 ## Reselect
 
--   Demo
+-   [Repo](https://github.com/reduxjs/reselect)
+-   [Demo](https://github.com/TianyuanC/react-redux-demo)
 -   re-Reslect 😂
 
 ---
 
-## Storybook
+## [Storybook](https://storybook.js.org/docs/guides/quick-start-guide/)
 
 -   Fast Prototype
--   Design System
+-   [Design System](https://github.com/danilowoz/react-atomic-design)
 -   Component Documentation
 
 ---
 
+import Code from "mdx-code";
+
 ## ES6 🤯
+
+---
+
+## Previously
+
+-   Handle incoming tasks
+
+---
+
+export default Code;
+
+```javascript
+const delay = (t, name, mute) => (poolId = 0) =>
+    new Promise(resolve => {
+        !mute && console.log(`[pool-${poolId}][t-${name}]: started`);
+        setTimeout(() => {
+            !mute && console.log(`[pool-${poolId}][t-${name}]: done`);
+            resolve();
+        }, t);
+    });
+
+const queueTask = (t, pool, tasks) =>
+    new Promise(resolve => {
+        setTimeout(() => {
+            tasks.forEach(task => pool.addTask(task));
+            resolve();
+        }, t);
+    });
+
+class ConnectionPool {
+    constructor(maxPool, tasks) {
+        this.maxPool = maxPool;
+        this.tasks = tasks;
+        this.status = true;
+    }
+
+    addTask(task) {
+        this.tasks.push(task);
+    }
+
+    launch() {
+        const currTasks = this.tasks.splice(0, this.maxPool);
+        while (currTasks.length < this.maxPool) {
+            currTasks.push(delay(500, "sleep", true));
+        }
+        Promise.all(
+            currTasks.map((eachTask, idx) =>
+                eachTask(idx).then(() => this._handleNextTask(idx))
+            )
+        ).then(() => {
+            console.log("all done");
+        });
+    }
+
+    stop() {
+        this.status = false;
+    }
+
+    _handleNextTask(idx) {
+        if (this.tasks.length === 0) {
+            return delay(500, "sleep", true)(idx).then(() =>
+                this.status || this.tasks.length > 0
+                    ? this._handleNextTask(idx)
+                    : null
+            );
+        } else {
+            const nextTask = this.tasks.splice(0, 1)[0];
+            return nextTask(idx).then(() => {
+                if (!this.status) {
+                    console.log(`[pool-${idx}]: Gracefully shutting down...`);
+                    return this._handleNextTask(idx);
+                }
+            });
+        }
+    }
+}
+```
+
+```javascript Incoming tasks...
+const task1 = delay(1000, "one");
+const task2 = delay(500, "two");
+const task3 = delay(600, "three");
+
+const pool = new ConnectionPool(2, []);
+pool.launch();
+const test = queueTask(2000, pool, [task1])
+    .then(() => queueTask(4000, pool, [task2, task3]))
+    .then(() => {
+        pool.stop();
+    });
+```
+
+---
+
+## Challenge
+
+-   Increase pool size dynamically
+
+---
+
+export default Code;
+
+```javascript
+const delay = (t, name, mute) => (poolId = 0) =>
+    new Promise(resolve => {
+        !mute && console.log(`[pool-${poolId}][t-${name}]: started`);
+        setTimeout(() => {
+            !mute && console.log(`[pool-${poolId}][t-${name}]: done`);
+            resolve();
+        }, t);
+    });
+
+const waitAndQueue = (t, pool, tasks) =>
+    new Promise(resolve => {
+        setTimeout(() => {
+            tasks.forEach(task => pool.addTask(task));
+            resolve();
+        }, t);
+    });
+
+class ConnectionPool {
+    constructor(maxPool, tasks) {
+        this.maxPool = maxPool;
+        this.tasks = tasks;
+        this.status = true;
+        this.currentPool = null;
+    }
+
+    addTask(task) {
+        this.tasks.push(task);
+    }
+
+    increaseSize() {
+        this.maxPool += 1;
+        Promise.all([
+            this.maxPool,
+            this.currentPool,
+            this._handleNextTask(this.maxPool - 1)
+        ]).then(([size]) => {
+            this.checkComplete(size);
+        });
+    }
+
+    launch() {
+        const currTasks = this.tasks.splice(0, this.maxPool);
+        while (currTasks.length < this.maxPool) {
+            currTasks.push(delay(500, "sleep", true));
+        }
+        this.currentPool = Promise.all([
+            this.maxPool,
+            ...currTasks.map((eachTask, idx) =>
+                eachTask(idx).then(() => this._handleNextTask(idx))
+            )
+        ]).then(([size]) => {
+            this.checkComplete(size);
+        });
+    }
+
+    checkComplete(size) {
+        if (size === this.maxPool) {
+            console.log(`all done`);
+        }
+    }
+
+    stop() {
+        this.status = false;
+    }
+
+    _handleNextTask(idx) {
+        if (this.tasks.length === 0) {
+            return delay(500, "sleep", true)(idx).then(() =>
+                this.status || this.tasks.length > 0
+                    ? this._handleNextTask(idx)
+                    : null
+            );
+        } else {
+            const nextTask = this.tasks.splice(0, 1)[0];
+            return nextTask(idx).then(() => this._handleNextTask(idx));
+        }
+    }
+}
+```
+
+```javascript Increase pool size
+const task1 = delay(1000, "one");
+const task2 = delay(2000, "two");
+const task3 = delay(600, "three");
+
+const pool = new ConnectionPool(1, []);
+pool.launch();
+const test = waitAndQueue(2000, pool, [task1])
+    .then(() =>
+        waitAndQueue(1500, pool, [task2, task3]).then(() => {
+            pool.increaseSize();
+        })
+    )
+    .then(() => {
+        pool.stop();
+    });
+```
 
 ---
 
